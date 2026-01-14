@@ -101,7 +101,7 @@ Tài liệu này triển khai chi tiết task list cho các tính năng nên b�
 ### Milestone A: Automation Script Manager
 
 #### A1. Thiết kế dữ liệu & API
-- **Prompt:** "Hãy tạo migration cho bảng `automation_scripts` và `automation_runs`, cập nhật models/DB layer tương ứng, và thêm CRUD API endpoints `/scripts` + endpoint `/scripts/run`. Yêu cầu: schema có đủ trường name/type/content/path/status/logs/window_id/script_id, có index hợp lý, và trả về JSON chuẩn hóa."
+- **Prompt:** "Hãy tạo migration cho bảng `automation_scripts` và `automation_runs` (nêu rõ kiểu dữ liệu, khóa ngoại, index), cập nhật DB layer tương ứng, và thêm CRUD API `/scripts` + endpoint `/scripts/run`. Yêu cầu: schema có đủ trường name/type/content/path/status/logs/window_id/script_id, validate input bằng schema, và trả về JSON chuẩn hóa + HTTP status phù hợp."
 
 #### A2. Engine thực thi
 - **Prompt:** "Hãy triển khai service chạy automation script theo window/proxy/profile hiện có. Hỗ trợ Puppeteer/Playwright/Selenium theo `type`, có batch size, timeout, và khả năng hủy job. Kèm logging chi tiết cho từng run."
