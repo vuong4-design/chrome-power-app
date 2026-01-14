@@ -20,6 +20,8 @@ Tài liệu này triển khai chi tiết task list cho các tính năng nên b�
 
 ### A3. UI & quan sát
 - [ ] UI quản lý script (list, editor, import/export).
+- [ ] Trình tạo script kéo thả (node-based workflow builder) để tạo luồng automation không cần code.
+- [ ] Thư viện node kéo thả (điều hướng, nhập liệu, chờ, điều kiện, lặp, chụp ảnh, xử lý lỗi).
 - [ ] UI theo dõi trạng thái chạy (success/fail, log).
 - [ ] Notification khi job hoàn thành.
 
