@@ -93,3 +93,57 @@ Tài liệu này triển khai chi tiết task list cho các tính năng nên b�
 - Các milestone có thể triển khai song song, nhưng Milestone A nên ưu tiên vì đây là tính năng được nêu rõ là còn thiếu.
 - Milestone B và D cần bổ sung schema DB và migration.
 - Milestone C cần xử lý file I/O và cơ chế import/export an toàn.
+
+---
+
+## Prompt gợi ý để bắt đầu triển khai (theo từng task)
+
+### Milestone A: Automation Script Manager
+
+#### A1. Thiết kế dữ liệu & API
+- **Prompt:** "Hãy tạo migration cho bảng `automation_scripts` và `automation_runs`, cập nhật models/DB layer tương ứng, và thêm CRUD API endpoints `/scripts` + endpoint `/scripts/run`. Yêu cầu: schema có đủ trường name/type/content/path/status/logs/window_id/script_id, có index hợp lý, và trả về JSON chuẩn hóa."
+
+#### A2. Engine thực thi
+- **Prompt:** "Hãy triển khai service chạy automation script theo window/proxy/profile hiện có. Hỗ trợ Puppeteer/Playwright/Selenium theo `type`, có batch size, timeout, và khả năng hủy job. Kèm logging chi tiết cho từng run."
+
+#### A3. UI & quan sát
+- **Prompt:** "Hãy bổ sung UI quản lý scripts (list/editor/import-export) và trang theo dõi job runs (status/log). Thêm notification khi job hoàn thành."
+
+#### A3.1 Trình tạo script kéo thả
+- **Prompt:** "Hãy xây dựng UI node-based workflow builder để tạo script bằng kéo thả. Cần có thư viện node cơ bản (navigate, click, input, wait, condition, loop, screenshot, error handling) và xuất ra cấu trúc JSON/script tương ứng."
+
+#### A4. Bảo mật & sandbox
+- **Prompt:** "Hãy bổ sung sandbox cho automation scripts: giới hạn file system access, allowlist domain/network, và validate input trước khi chạy."
+
+### Milestone B: Proxy Health-check & Auto-rotation
+
+#### B1. Health-check service
+- **Prompt:** "Hãy triển khai service kiểm tra proxy định kỳ (latency, HTTP status, geo), lưu lịch sử và trạng thái (healthy/unhealthy/degraded), và thêm migration/schema lưu health metrics."
+
+#### B2. API & UI
+- **Prompt:** "Hãy thêm API `/proxy/health` trả về trạng thái proxy, và UI hiển thị latency/status + filter theo trạng thái."
+
+#### B3. Auto-rotation
+- **Prompt:** "Hãy triển khai auto-rotation proxy khi proxy lỗi: chọn proxy thay thế theo round-robin hoặc lowest-latency, có toggle theo window/group."
+
+### Milestone C: Backup/Restore Window & Profile
+
+#### C1. Export
+- **Prompt:** "Hãy thêm chức năng export profiles/windows/proxies ra file zip, kèm schema version, và hỗ trợ export theo scope (all/selected)."
+
+#### C2. Import
+- **Prompt:** "Hãy thêm chức năng import file zip để khôi phục dữ liệu, có validation file, xử lý conflict (merge/replace/skip), và rollback nếu lỗi."
+
+#### C3. UI & UX
+- **Prompt:** "Hãy thêm UI Backup/Restore trong Settings với progress indicator."
+
+### Milestone D: Audit Log & Activity History
+
+#### D1. Logging backend
+- **Prompt:** "Hãy thêm bảng `audit_logs` và middleware ghi log các thao tác CRUD window/proxy/profile (action, actor, timestamp, metadata)."
+
+#### D2. UI hiển thị
+- **Prompt:** "Hãy bổ sung UI hiển thị audit log với filter (type/time/window) và export CSV/JSON."
+
+#### D3. Integrations
+- **Prompt:** "Hãy tích hợp audit log với hệ thống logger hiện có (structured logs)."
