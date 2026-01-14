@@ -6,6 +6,7 @@ import IPRouter from './routes/ip';
 import WindowRouter from './routes/window';
 import ProfilesRouter from './routes/profiles';
 import ProxyRouter from './routes/proxy';
+import ScriptsRouter from './routes/scripts';
 
 const app: Express = express();
 let port: number = 49156; // 初始端口
@@ -17,6 +18,7 @@ app.use('/ip', IPRouter);
 app.use('/window', WindowRouter);
 app.use('/profiles', ProfilesRouter);
 app.use('/proxy', ProxyRouter);
+app.use('/scripts', ScriptsRouter);
 
 app.get('/status', async (req, res) => {
   res.send({

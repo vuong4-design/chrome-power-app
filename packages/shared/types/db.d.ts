@@ -74,6 +74,37 @@ export namespace DB {
     extension_id?: number;
     window_id?: number;
   }
+
+  export interface AutomationScript {
+    id?: number;
+    name: string;
+    type: string;
+    content?: string | null;
+    path?: string | null;
+    created_at?: string;
+    updated_at?: string;
+  }
+
+  export interface AutomationRun {
+    id?: number;
+    script_id: number;
+    window_id: number;
+    status: string;
+    logs?: string | null;
+    started_at?: string | null;
+    finished_at?: string | null;
+    created_at?: string;
+    updated_at?: string;
+  }
+
+  export interface AutomationRunCreateInput {
+    script_id: number;
+    window_id: number;
+    status: string;
+    logs?: string | null;
+    started_at?: string | null;
+    finished_at?: string | null;
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
