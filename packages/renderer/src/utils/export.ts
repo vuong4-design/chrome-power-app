@@ -1,10 +1,9 @@
 import JSZip from 'jszip';
+import {EXPORT_SCHEMA_VERSION} from '../../../shared/constants';
 
 export type ExportScope = 'all' | 'selected';
 
 export type ExportEntity = 'windows' | 'proxies' | 'profiles';
-
-export const EXPORT_SCHEMA_VERSION = 1;
 
 type BuildExportZipOptions = {
   entity: ExportEntity;

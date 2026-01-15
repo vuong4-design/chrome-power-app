@@ -8,6 +8,7 @@ import {initWindowService} from './window-service';
 import {initExtensionService} from './extension-service';
 import {initMultiWindowSyncService} from './multi-window-sync-service';
 import {initAutomationService} from './automation-service';
+import {initBackupService} from './backup-service';
 
 export async function initServices() {
   initCommonService();
@@ -20,4 +21,5 @@ export async function initServices() {
   initExtensionService();
   initMultiWindowSyncService();
   initAutomationService();
+  initBackupService();
 }
