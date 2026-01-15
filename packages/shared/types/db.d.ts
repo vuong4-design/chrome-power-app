@@ -46,6 +46,33 @@ export namespace DB {
     // ... other properties
   }
 
+  export interface ProxyHealth {
+    id?: number;
+    proxy_id: number;
+    status: 'healthy' | 'unhealthy' | 'degraded';
+    latency_ms?: number | null;
+    http_status?: number | null;
+    geo_country?: string | null;
+    geo_region?: string | null;
+    geo_city?: string | null;
+    checked_at?: string;
+    created_at?: string;
+    updated_at?: string;
+  }
+
+  export interface ProxyHealthHistory {
+    id?: number;
+    proxy_id: number;
+    status: 'healthy' | 'unhealthy' | 'degraded';
+    latency_ms?: number | null;
+    http_status?: number | null;
+    geo_country?: string | null;
+    geo_region?: string | null;
+    geo_city?: string | null;
+    checked_at?: string;
+    created_at?: string;
+  }
+
   export interface Group {
     id?: number;
     name?: string;

@@ -1,6 +1,7 @@
 import {initCommonService} from './common-service';
 import {initGroupService} from './group-service';
 import {initProxyService} from './proxy-service';
+import {initProxyHealthService} from './proxy-health-service';
 import {initSyncService} from './sync-service';
 import {initTagService} from './tag-service';
 import {initWindowService} from './window-service';
@@ -13,6 +14,7 @@ export async function initServices() {
   initWindowService();
   initGroupService();
   initProxyService();
+  initProxyHealthService();
   initTagService();
   initSyncService();
   initExtensionService();
