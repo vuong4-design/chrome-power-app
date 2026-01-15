@@ -1,5 +1,6 @@
 import express from 'express';
 import {AutomationDB} from '/@/db/automation';
+import {cancelAutomationRuns, enqueueAutomationRuns} from '/@/services/automation-service';
 import type {DB} from '../../../../shared/types/db';
 
 type ValidationResult<T> = {success: true; data: T} | {success: false; error: string};
@@ -101,12 +102,14 @@ const parseScriptUpdateInput = (
 
 const parseRunInput = (
   body: unknown,
-): ValidationResult<{scriptId: number; windowIds: number[]}> => {
+): ValidationResult<{scriptId: number; windowIds: number[]; batchSize?: number; timeoutMs?: number}> => {
   if (!isRecord(body)) {
     return {success: false, error: 'Body must be an object.'};
   }
   const scriptId = body.scriptId;
   const windowIds = body.windowIds;
+  const batchSize = body.batchSize;
+  const timeoutMs = body.timeoutMs;
 
   if (typeof scriptId !== 'number' || !Number.isInteger(scriptId) || scriptId <= 0) {
     return {success: false, error: 'scriptId must be a positive integer.'};
@@ -121,7 +124,36 @@ const parseRunInput = (
     return {success: false, error: 'windowIds must contain positive integers only.'};
   }
 
-  return {success: true, data: {scriptId, windowIds: parsedWindowIds}};
+  if (batchSize !== undefined) {
+    if (typeof batchSize !== 'number' || !Number.isInteger(batchSize) || batchSize <= 0) {
+      return {success: false, error: 'batchSize must be a positive integer.'};
+    }
+  }
+
+  if (timeoutMs !== undefined) {
+    if (typeof timeoutMs !== 'number' || timeoutMs <= 0) {
+      return {success: false, error: 'timeoutMs must be a positive number.'};
+    }
+  }
+
+  return {success: true, data: {scriptId, windowIds: parsedWindowIds, batchSize, timeoutMs}};
+};
+
+const parseCancelInput = (body: unknown): ValidationResult<{runIds: number[]}> => {
+  if (!isRecord(body)) {
+    return {success: false, error: 'Body must be an object.'};
+  }
+  const runIds = body.runIds;
+  if (!Array.isArray(runIds) || runIds.length === 0) {
+    return {success: false, error: 'runIds must be a non-empty array.'};
+  }
+  const parsedRunIds = runIds.filter(
+    (id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0,
+  );
+  if (parsedRunIds.length !== runIds.length) {
+    return {success: false, error: 'runIds must contain positive integers only.'};
+  }
+  return {success: true, data: {runIds: parsedRunIds}};
 };
 
 const router = express.Router();
@@ -196,7 +228,7 @@ router.post('/run', async (req, res) => {
     res.status(400).json({success: false, error: {message: result.error}});
     return;
   }
-  const {scriptId, windowIds} = result.data;
+  const {scriptId, windowIds, batchSize, timeoutMs} = result.data;
   const script = await AutomationDB.getScriptById(scriptId);
   if (!script) {
     res.status(404).json({success: false, error: {message: 'Script not found.'}});
@@ -210,6 +242,7 @@ router.post('/run', async (req, res) => {
   }));
 
   const runIds = await AutomationDB.createRuns(runRows);
+  await enqueueAutomationRuns(script, runIds as number[], windowIds, {batchSize, timeoutMs});
   res.status(201).json({
     success: true,
     data: {
@@ -218,6 +251,16 @@ router.post('/run', async (req, res) => {
       runIds,
     },
   });
+});
+
+router.post('/run/cancel', async (req, res) => {
+  const result = parseCancelInput(req.body);
+  if (!result.success) {
+    res.status(400).json({success: false, error: {message: result.error}});
+    return;
+  }
+  await cancelAutomationRuns(result.data.runIds);
+  res.status(200).json({success: true});
 });
 
 export default router;

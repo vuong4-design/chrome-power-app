@@ -51,6 +51,26 @@ const createRuns = async (runs: DB.AutomationRunCreateInput[]) => {
   );
 };
 
+const getRunById = async (id: number) => {
+  return await db('automation_runs').where({id}).first();
+};
+
+const updateRun = async (id: number, updates: Partial<DB.AutomationRun>) => {
+  return await db('automation_runs').where({id}).update({
+    ...updates,
+    updated_at: db.fn.now(),
+  });
+};
+
+const appendRunLog = async (id: number, message: string) => {
+  const existing = await db('automation_runs').where({id}).first('logs');
+  const nextLog = `${existing?.logs ?? ''}${message}\n`;
+  return await db('automation_runs').where({id}).update({
+    logs: nextLog,
+    updated_at: db.fn.now(),
+  });
+};
+
 const getRunsByScriptId = async (scriptId: number) => {
   return await db('automation_runs')
     .where({script_id: scriptId})
@@ -64,5 +84,8 @@ export const AutomationDB = {
   updateScript,
   deleteScript,
   createRuns,
+  getRunById,
+  updateRun,
+  appendRunLog,
   getRunsByScriptId,
 };
