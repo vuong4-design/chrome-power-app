@@ -24,6 +24,7 @@ const parseScriptInput = (body: unknown): ValidationResult<DB.AutomationScript> 
   const type = body.type;
   const content = body.content ?? null;
   const path = body.path ?? null;
+  const workflow = body.workflow ?? null;
 
   if (typeof name !== 'string' || name.trim().length === 0) {
     return {success: false, error: 'name is required.'};
@@ -37,6 +38,9 @@ const parseScriptInput = (body: unknown): ValidationResult<DB.AutomationScript> 
   if (path !== null && path !== undefined && typeof path !== 'string') {
     return {success: false, error: 'path must be a string.'};
   }
+  if (workflow !== null && workflow !== undefined && typeof workflow !== 'string') {
+    return {success: false, error: 'workflow must be a string.'};
+  }
   if (!content && !path) {
     return {success: false, error: 'Either content or path is required.'};
   }
@@ -48,6 +52,7 @@ const parseScriptInput = (body: unknown): ValidationResult<DB.AutomationScript> 
       type: type.trim(),
       content: content ? content : null,
       path: path ? path : null,
+      workflow: workflow ? workflow : null,
     },
   };
 };
@@ -87,6 +92,13 @@ const parseScriptUpdateInput = (
       return {success: false, error: 'path must be a string.'};
     }
     update.path = body.path ?? null;
+  }
+
+  if (body.workflow !== undefined) {
+    if (body.workflow !== null && typeof body.workflow !== 'string') {
+      return {success: false, error: 'workflow must be a string.'};
+    }
+    update.workflow = body.workflow ?? null;
   }
 
   if (Object.keys(update).length === 0) {

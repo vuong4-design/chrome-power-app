@@ -21,6 +21,7 @@ const config = {
   resolve: {
     alias: {
       '/@/': join(PACKAGE_ROOT, 'src') + '/',
+      reactflow: join(PACKAGE_ROOT, 'src/vendor/reactflow'),
     },
   },
   base: '',

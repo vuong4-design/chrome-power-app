@@ -108,6 +108,7 @@ export namespace DB {
     type: string;
     content?: string | null;
     path?: string | null;
+    workflow?: string | null;
     created_at?: string;
     updated_at?: string;
   }

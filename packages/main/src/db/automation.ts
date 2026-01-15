@@ -15,6 +15,7 @@ const createScript = async (script: DB.AutomationScript) => {
     type: script.type,
     content: script.content ?? null,
     path: script.path ?? null,
+    workflow: script.workflow ?? null,
     created_at: db.fn.now(),
     updated_at: db.fn.now(),
   });
