@@ -7,9 +7,11 @@ import {
   Form,
   Input,
   Modal,
+  Radio,
   Select,
   Space,
   Table,
+  Tag,
   message,
 } from 'antd';
 import _, {debounce} from 'lodash';
@@ -19,6 +21,7 @@ import type {DB} from '../../../../shared/types/db';
 import {CommonBridge, ProxyBridge} from '#preload';
 import type {SearchProps} from 'antd/es/input';
 import {containsKeyword} from '/@/utils/str';
+import {buildExportZip, type ExportScope} from '/@/utils/export';
 import {
   GlobalOutlined,
   MoreOutlined,
@@ -37,7 +40,6 @@ import {PIN_URL} from '../../../../shared/constants';
 import {MESSAGE_CONFIG} from '/@/constants';
 import {useNavigate} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
-import * as ExcelJS from 'exceljs';
 
 type ProxyFormProps = {
   proxy_type?: string;
@@ -50,6 +52,22 @@ type ProxyFormProps = {
   remark?: string;
 };
 
+type ProxyHealthRow = {
+  proxy_id: number;
+  status: 'healthy' | 'unhealthy' | 'degraded';
+  latency_ms?: number | null;
+  http_status?: number | null;
+  geo_country?: string | null;
+  geo_region?: string | null;
+  geo_city?: string | null;
+};
+
+type ProxyRow = DB.Proxy & {
+  health_status?: ProxyHealthRow['status'];
+  health_latency_ms?: number | null;
+  health_http_status?: number | null;
+};
+
 const Proxy = () => {
   const {t} = useTranslation();
   const OFFSET = 266;
@@ -60,8 +78,11 @@ const Proxy = () => {
   const [selectedRow, setSelectedRow] = useState<DB.Proxy>();
   const [proxyData, setProxyData] = useState<DB.Proxy[]>([]);
   const [proxyDataCopy, setProxyDataCopy] = useState<DB.Proxy[]>([]);
+  const [healthFilter, setHealthFilter] = useState<'all' | ProxyHealthRow['status']>('all');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [exportScope, setExportScope] = useState<ExportScope>('all');
   const [messageApi, contextHolder] = message.useMessage(MESSAGE_CONFIG);
   const [form] = Form.useForm();
   const [formValue, setFormValue] = useState<ProxyFormProps>();
@@ -112,7 +133,7 @@ const Proxy = () => {
     return connectivity[index]?.status === 'connected' ? 'success' : 'error';
   }
 
-  const columns: ColumnsType<DB.Proxy> = [
+  const columns: ColumnsType<ProxyRow> = [
     {
       title: 'ID',
       width: 60,
@@ -181,6 +202,24 @@ const Proxy = () => {
     //     </Space>
     //   ),
     // },
+    {
+      title: t('proxy_column_health'),
+      dataIndex: 'health_status',
+      key: 'health_status',
+      width: 120,
+      render: (_, recorder) => {
+        const status = recorder.health_status ?? 'unhealthy';
+        const color = status === 'healthy' ? 'green' : status === 'degraded' ? 'gold' : 'red';
+        return <Tag color={color}>{t(`proxy_health_${status}`)}</Tag>;
+      },
+    },
+    {
+      title: t('proxy_column_latency'),
+      dataIndex: 'health_latency_ms',
+      key: 'health_latency_ms',
+      width: 120,
+      render: value => (value !== null && value !== undefined ? `${value} ms` : '-'),
+    },
     {
       title: t('proxy_column_remark'),
       dataIndex: 'remark',
@@ -282,7 +321,7 @@ const Proxy = () => {
         deleteProxy();
         break;
       case 'export':
-        exportProxy();
+        openExportModal();
         break;
 
       default:
@@ -290,28 +329,34 @@ const Proxy = () => {
     }
   };
 
+  const openExportModal = () => {
+    setExportScope(selectedRowKeys.length > 0 ? 'selected' : 'all');
+    setExportModalVisible(true);
+  };
+
   const exportProxy = async () => {
-    const data = proxyData.map(item => {
-      return {
-        ...item,
-        proxy: item.proxy,
-      };
+    if (exportScope === 'selected' && selectedRowKeys.length === 0) {
+      messageApi.warning(t('export_scope_empty'));
+      return;
+    }
+    const data =
+      exportScope === 'selected'
+        ? proxyDataCopy.filter(item => item.id && selectedRowKeys.includes(item.id))
+        : proxyDataCopy;
+    const buffer = await buildExportZip({
+      entity: 'proxies',
+      data,
+      scope: exportScope,
     });
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Proxy');
-    worksheet.addRow(['ID', 'Proxy', 'Proxy Type', 'IP', 'Remark', 'Checker']);
-    data.forEach(item => {
-      worksheet.addRow([item.id, item.proxy, item.proxy_type, item.ip, item.remark, item.ip_checker]);
-    });
-    const buffer = await workbook.xlsx.writeBuffer();
     const result = await CommonBridge?.saveDialog({
-      title: 'Export Proxy',
-      defaultPath: 'proxy.xlsx',
-      filters: [{name: 'Excel', extensions: ['xlsx']}],
+      title: t('export_scope_title'),
+      defaultPath: 'proxies-export.zip',
+      filters: [{name: 'Zip Files', extensions: ['zip']}],
     });
     if (result.filePath) {
       await CommonBridge?.saveFile(result.filePath, buffer);
       messageApi.success('Export successfully');
+      setExportModalVisible(false);
     }
   };
 
@@ -327,29 +372,70 @@ const Proxy = () => {
     };
   }, []);
 
+  const mergeHealth = (proxies: DB.Proxy[], healthRows: ProxyHealthRow[]) => {
+    const healthMap = new Map(healthRows.map(row => [row.proxy_id, row]));
+    return proxies.map(proxy => {
+      const health = proxy.id ? healthMap.get(proxy.id) : undefined;
+      return {
+        ...proxy,
+        health_status: health?.status,
+        health_latency_ms: health?.latency_ms ?? null,
+        health_http_status: health?.http_status ?? null,
+      };
+    });
+  };
+
+  const applyFilters = (data: ProxyRow[], keyword: string, status: typeof healthFilter) => {
+    let filtered = [...data];
+    if (status !== 'all') {
+      filtered = filtered.filter(item => item.health_status === status);
+    }
+    if (keyword) {
+      const lowered = keyword.toLowerCase();
+      filtered = filtered.filter(
+        f =>
+          containsKeyword(f.ip_country, lowered) ||
+          containsKeyword(f.proxy, lowered) ||
+          containsKeyword(f.ip, lowered) ||
+          containsKeyword(f.proxy_type, lowered),
+      );
+    }
+    setProxyData(filtered);
+  };
+
+  const fetchProxyHealth = async () => {
+    try {
+      const api = await CommonBridge?.getApi();
+      if (!api?.url) {
+        return [];
+      }
+      const response = await fetch(`${api.url}/proxy/health`);
+      const json = (await response.json()) as {success: boolean; data: Array<{health?: ProxyHealthRow}>};
+      if (!json.success) {
+        return [];
+      }
+      return json.data
+        .map(item => item.health)
+        .filter((item): item is ProxyHealthRow => Boolean(item));
+    } catch {
+      return [];
+    }
+  };
+
   const fetchProxyData = async () => {
     setLoading(true);
-    const data = await ProxyBridge?.getAll();
-    setProxyData(data);
+    const [proxyRows, healthRows] = await Promise.all([
+      ProxyBridge?.getAll(),
+      fetchProxyHealth(),
+    ]);
+    const data = mergeHealth((proxyRows ?? []) as DB.Proxy[], healthRows);
     setProxyDataCopy(data);
+    applyFilters(data, searchValue, healthFilter);
     setLoading(false);
   };
 
   const onSearch: SearchProps['onSearch'] = (value: string) => {
-    if (value) {
-      const keyword = value.toLowerCase();
-      setProxyData(
-        [...proxyDataCopy].filter(
-          f =>
-            containsKeyword(f.ip_country, keyword) ||
-            containsKeyword(f.proxy, keyword) ||
-            containsKeyword(f.ip, keyword) ||
-            containsKeyword(f.proxy_type, keyword),
-        ),
-      );
-    } else {
-      fetchProxyData();
-    }
+    applyFilters(proxyDataCopy as ProxyRow[], value, healthFilter);
   };
 
   const debounceSearch = debounce(value => {
@@ -476,6 +562,20 @@ const Proxy = () => {
           >
             {t('proxy_check')}
           </Button>
+          <Select
+            value={healthFilter}
+            onChange={value => {
+              setHealthFilter(value);
+              applyFilters(proxyDataCopy as ProxyRow[], searchValue, value);
+            }}
+            options={[
+              {label: t('proxy_health_all'), value: 'all'},
+              {label: t('proxy_health_healthy'), value: 'healthy'},
+              {label: t('proxy_health_degraded'), value: 'degraded'},
+              {label: t('proxy_health_unhealthy'), value: 'unhealthy'},
+            ]}
+            style={{width: 160}}
+          />
           <Button
             type="default"
             onClick={async () => {
@@ -555,6 +655,25 @@ const Proxy = () => {
         <div className="pl-[36px]">
           <div>Are you sure you want to delete the selected IPs?</div>
         </div>
+      </Modal>
+      <Modal
+        title={t('export_scope_title')}
+        open={exportModalVisible}
+        centered
+        onOk={exportProxy}
+        onCancel={() => setExportModalVisible(false)}
+        okText={t('export_scope_confirm')}
+        cancelText={t('export_scope_cancel')}
+      >
+        <Radio.Group
+          value={exportScope}
+          onChange={event => setExportScope(event.target.value)}
+        >
+          <Space direction="vertical">
+            <Radio value="all">{t('export_scope_all')}</Radio>
+            <Radio value="selected">{t('export_scope_selected')}</Radio>
+          </Space>
+        </Radio.Group>
       </Modal>
       <Modal
         title="Update Proxy"

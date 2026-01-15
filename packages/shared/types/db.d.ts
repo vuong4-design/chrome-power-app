@@ -29,6 +29,8 @@ export namespace DB {
     ip_country?: string;
     ip_checker?: string;
     tags_name?: string[];
+    auto_rotate_proxy?: boolean;
+    proxy_rotation_strategy?: string;
   }
 
   export interface Proxy {
@@ -46,9 +48,38 @@ export namespace DB {
     // ... other properties
   }
 
+  export interface ProxyHealth {
+    id?: number;
+    proxy_id: number;
+    status: 'healthy' | 'unhealthy' | 'degraded';
+    latency_ms?: number | null;
+    http_status?: number | null;
+    geo_country?: string | null;
+    geo_region?: string | null;
+    geo_city?: string | null;
+    checked_at?: string;
+    created_at?: string;
+    updated_at?: string;
+  }
+
+  export interface ProxyHealthHistory {
+    id?: number;
+    proxy_id: number;
+    status: 'healthy' | 'unhealthy' | 'degraded';
+    latency_ms?: number | null;
+    http_status?: number | null;
+    geo_country?: string | null;
+    geo_region?: string | null;
+    geo_city?: string | null;
+    checked_at?: string;
+    created_at?: string;
+  }
+
   export interface Group {
     id?: number;
     name?: string;
+    auto_rotate_proxy?: boolean;
+    proxy_rotation_strategy?: string;
   }
 
   export interface Tag {
@@ -73,6 +104,38 @@ export namespace DB {
     id?: number;
     extension_id?: number;
     window_id?: number;
+  }
+
+  export interface AutomationScript {
+    id?: number;
+    name: string;
+    type: string;
+    content?: string | null;
+    path?: string | null;
+    workflow?: string | null;
+    created_at?: string;
+    updated_at?: string;
+  }
+
+  export interface AutomationRun {
+    id?: number;
+    script_id: number;
+    window_id: number;
+    status: string;
+    logs?: string | null;
+    started_at?: string | null;
+    finished_at?: string | null;
+    created_at?: string;
+    updated_at?: string;
+  }
+
+  export interface AutomationRunCreateInput {
+    script_id: number;
+    window_id: number;
+    status: string;
+    logs?: string | null;
+    started_at?: string | null;
+    finished_at?: string | null;
   }
 }
 

@@ -23,6 +23,10 @@ export const CommonBridge = {
     const result = await ipcRenderer.invoke('common-save-file', {filePath, buffer});
     return result;
   },
+  async restoreBackup(filePath: string, strategy: 'merge' | 'replace' | 'skip') {
+    const result = await ipcRenderer.invoke('backup-restore', {filePath, strategy});
+    return result;
+  },
   async getSettings() {
     const result = await ipcRenderer.invoke('common-fetch-settings');
     return result;

@@ -1,5 +1,7 @@
 export const DB_ACTION_STATUS = {};
 
+export const EXPORT_SCHEMA_VERSION = 1;
+
 export const PIN_URL = [
   {
     name: 'Google',
