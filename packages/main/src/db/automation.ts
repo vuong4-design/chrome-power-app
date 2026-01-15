@@ -77,6 +77,10 @@ const getRunsByScriptId = async (scriptId: number) => {
     .orderBy('created_at', 'desc');
 };
 
+const allRuns = async () => {
+  return await db('automation_runs').orderBy('created_at', 'desc');
+};
+
 export const AutomationDB = {
   allScripts,
   getScriptById,
@@ -88,4 +92,5 @@ export const AutomationDB = {
   updateRun,
   appendRunLog,
   getRunsByScriptId,
+  allRuns,
 };

@@ -7,6 +7,8 @@ import {openFingerprintWindow} from '../fingerprint';
 import puppeteer from 'puppeteer';
 import {pathToFileURL} from 'url';
 import {createRequire} from 'module';
+import {ipcMain} from 'electron';
+import {bridgeMessageToUI} from '../mainWindow';
 
 const logger = createLogger(SERVICE_LOGGER_LABEL);
 const require = createRequire(import.meta.url);
@@ -206,6 +208,10 @@ const executeRun = async (run: RunContext) => {
       status: 'completed',
       finished_at: new Date().toISOString(),
     });
+    bridgeMessageToUI({
+      type: 'success',
+      text: `Automation run ${runId} completed.`,
+    });
   } catch (error) {
     const message = (error as Error).message ?? 'Unknown error';
     const status = controller.signal.aborted ? 'cancelled' : message.includes('timed out') ? 'timeout' : 'failed';
@@ -213,6 +219,10 @@ const executeRun = async (run: RunContext) => {
     await AutomationDB.updateRun(runId, {
       status,
       finished_at: new Date().toISOString(),
+    });
+    bridgeMessageToUI({
+      type: status === 'cancelled' ? 'warning' : 'error',
+      text: `Automation run ${runId} ${status}.`,
     });
   } finally {
     activeRuns.delete(runId);
@@ -272,4 +282,60 @@ export const cancelAutomationRuns = async (runIds: number[]) => {
 
 export const initAutomationService = () => {
   logger.info('init automation service...');
+  ipcMain.handle('automation-script-get-all', async () => {
+    return await AutomationDB.allScripts();
+  });
+
+  ipcMain.handle('automation-script-create', async (_, script: DB.AutomationScript) => {
+    const {id} = await AutomationDB.createScript(script);
+    return await AutomationDB.getScriptById(id);
+  });
+
+  ipcMain.handle(
+    'automation-script-update',
+    async (_, id: number, updates: Partial<DB.AutomationScript>) => {
+      await AutomationDB.updateScript(id, updates);
+      return await AutomationDB.getScriptById(id);
+    },
+  );
+
+  ipcMain.handle('automation-script-delete', async (_, id: number) => {
+    return await AutomationDB.deleteScript(id);
+  });
+
+  ipcMain.handle('automation-run-get-all', async () => {
+    return await AutomationDB.allRuns();
+  });
+
+  ipcMain.handle('automation-run-get-by-script', async (_, scriptId: number) => {
+    return await AutomationDB.getRunsByScriptId(scriptId);
+  });
+
+  ipcMain.handle(
+    'automation-run-start',
+    async (
+      _,
+      scriptId: number,
+      windowIds: number[],
+      options: AutomationRunOptions = {},
+    ) => {
+      const script = await AutomationDB.getScriptById(scriptId);
+      if (!script) {
+        throw new Error('Script not found.');
+      }
+      const runRows: DB.AutomationRunCreateInput[] = windowIds.map(windowId => ({
+        script_id: scriptId,
+        window_id: windowId,
+        status: 'pending',
+      }));
+      const runIds = await AutomationDB.createRuns(runRows);
+      await enqueueAutomationRuns(script, runIds as number[], windowIds, options);
+      return runIds;
+    },
+  );
+
+  ipcMain.handle('automation-run-cancel', async (_, runIds: number[]) => {
+    await cancelAutomationRuns(runIds);
+    return true;
+  });
 };
