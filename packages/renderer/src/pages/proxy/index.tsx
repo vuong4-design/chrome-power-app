@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   Modal,
+  Radio,
   Select,
   Space,
   Table,
@@ -20,6 +21,7 @@ import type {DB} from '../../../../shared/types/db';
 import {CommonBridge, ProxyBridge} from '#preload';
 import type {SearchProps} from 'antd/es/input';
 import {containsKeyword} from '/@/utils/str';
+import {buildExportZip, type ExportScope} from '/@/utils/export';
 import {
   GlobalOutlined,
   MoreOutlined,
@@ -38,7 +40,6 @@ import {PIN_URL} from '../../../../shared/constants';
 import {MESSAGE_CONFIG} from '/@/constants';
 import {useNavigate} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
-import * as ExcelJS from 'exceljs';
 
 type ProxyFormProps = {
   proxy_type?: string;
@@ -80,6 +81,8 @@ const Proxy = () => {
   const [healthFilter, setHealthFilter] = useState<'all' | ProxyHealthRow['status']>('all');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [exportScope, setExportScope] = useState<ExportScope>('all');
   const [messageApi, contextHolder] = message.useMessage(MESSAGE_CONFIG);
   const [form] = Form.useForm();
   const [formValue, setFormValue] = useState<ProxyFormProps>();
@@ -318,7 +321,7 @@ const Proxy = () => {
         deleteProxy();
         break;
       case 'export':
-        exportProxy();
+        openExportModal();
         break;
 
       default:
@@ -326,28 +329,34 @@ const Proxy = () => {
     }
   };
 
+  const openExportModal = () => {
+    setExportScope(selectedRowKeys.length > 0 ? 'selected' : 'all');
+    setExportModalVisible(true);
+  };
+
   const exportProxy = async () => {
-    const data = proxyData.map(item => {
-      return {
-        ...item,
-        proxy: item.proxy,
-      };
+    if (exportScope === 'selected' && selectedRowKeys.length === 0) {
+      messageApi.warning(t('export_scope_empty'));
+      return;
+    }
+    const data =
+      exportScope === 'selected'
+        ? proxyDataCopy.filter(item => item.id && selectedRowKeys.includes(item.id))
+        : proxyDataCopy;
+    const buffer = await buildExportZip({
+      entity: 'proxies',
+      data,
+      scope: exportScope,
     });
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Proxy');
-    worksheet.addRow(['ID', 'Proxy', 'Proxy Type', 'IP', 'Remark', 'Checker']);
-    data.forEach(item => {
-      worksheet.addRow([item.id, item.proxy, item.proxy_type, item.ip, item.remark, item.ip_checker]);
-    });
-    const buffer = await workbook.xlsx.writeBuffer();
     const result = await CommonBridge?.saveDialog({
-      title: 'Export Proxy',
-      defaultPath: 'proxy.xlsx',
-      filters: [{name: 'Excel', extensions: ['xlsx']}],
+      title: t('export_scope_title'),
+      defaultPath: 'proxies-export.zip',
+      filters: [{name: 'Zip Files', extensions: ['zip']}],
     });
     if (result.filePath) {
       await CommonBridge?.saveFile(result.filePath, buffer);
       messageApi.success('Export successfully');
+      setExportModalVisible(false);
     }
   };
 
@@ -646,6 +655,25 @@ const Proxy = () => {
         <div className="pl-[36px]">
           <div>Are you sure you want to delete the selected IPs?</div>
         </div>
+      </Modal>
+      <Modal
+        title={t('export_scope_title')}
+        open={exportModalVisible}
+        centered
+        onOk={exportProxy}
+        onCancel={() => setExportModalVisible(false)}
+        okText={t('export_scope_confirm')}
+        cancelText={t('export_scope_cancel')}
+      >
+        <Radio.Group
+          value={exportScope}
+          onChange={event => setExportScope(event.target.value)}
+        >
+          <Space direction="vertical">
+            <Radio value="all">{t('export_scope_all')}</Radio>
+            <Radio value="selected">{t('export_scope_selected')}</Radio>
+          </Space>
+        </Radio.Group>
       </Modal>
       <Modal
         title="Update Proxy"

@@ -5,6 +5,7 @@ import {
   Dropdown,
   Input,
   Modal,
+  Radio,
   Select,
   Space,
   Table,
@@ -18,7 +19,6 @@ import type {ColumnsType} from 'antd/es/table';
 import type {MenuInfo} from 'rc-menu/lib/interface';
 import {useEffect, useMemo, useState} from 'react';
 import _, {debounce} from 'lodash';
-import * as ExcelJS from 'exceljs';
 
 import {
   CloseOutlined,
@@ -38,6 +38,7 @@ import type {DB} from '../../../../shared/types/db';
 import {CommonBridge, GroupBridge, ProxyBridge, TagBridge, WindowBridge} from '#preload';
 import type {SearchProps} from 'antd/es/input';
 import {containsKeyword} from '/@/utils/str';
+import {buildExportZip, type ExportEntity, type ExportScope} from '/@/utils/export';
 import {useNavigate} from 'react-router-dom';
 import {MESSAGE_CONFIG, WINDOW_STATUS} from '/@/constants';
 import {useTranslation} from 'react-i18next';
@@ -61,6 +62,9 @@ const Windows = () => {
   const [proxySettingVisible, setProxySettingVisible] = useState(false);
   const [proxies, setProxies] = useState<DB.Proxy[]>([]);
   const [selectedProxy, setSelectedProxy] = useState<number>();
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [exportScope, setExportScope] = useState<ExportScope>('all');
+  const [exportEntity, setExportEntity] = useState<ExportEntity>('windows');
   const navigate = useNavigate();
 
   const moreActionDropdownItems: MenuProps['items'] = [
@@ -72,6 +76,11 @@ const Windows = () => {
     {
       key: 'export',
       label: t('window_export'),
+      icon: <ExportOutlined />,
+    },
+    {
+      key: 'export-profiles',
+      label: t('profile_export'),
       icon: <ExportOutlined />,
     },
     {
@@ -335,65 +344,79 @@ const Windows = () => {
         deleteWindows();
         break;
       case 'export':
-        exportWindows();
+        openExportModal('windows');
+        break;
+      case 'export-profiles':
+        openExportModal('profiles');
         break;
       default:
         break;
     }
   };
 
+  const openExportModal = (entity: ExportEntity) => {
+    setExportEntity(entity);
+    setExportScope(selectedRowKeys.length > 0 ? 'selected' : 'all');
+    setExportModalVisible(true);
+  };
+
+  const resolveWindowExportData = (data: DB.Window[]) => {
+    return data.map(item => {
+      const tagNames = item.tags
+        ? item.tags
+            .toString()
+            .split(',')
+            .map(tag => tagMap.get(Number(tag))?.name)
+            .filter(Boolean)
+        : [];
+      return {
+        ...item,
+        tags: tagNames,
+        proxy: proxies.find(proxy => proxy.id === item.proxy_id)?.proxy ?? null,
+      };
+    });
+  };
+
+  const resolveProfileExportData = (data: DB.Window[]) => {
+    return data.map(item => ({
+      id: item.id,
+      profile_id: item.profile_id,
+      name: item.name,
+      group_id: item.group_id,
+      group_name: item.group_name,
+      remark: item.remark,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    }));
+  };
+
   const exportWindows = async () => {
     try {
-      // 导出窗口数据
-      const data = windowData.map(item => {
-        return {
-          ...item,
-          proxy: proxies.find(proxy => proxy.id === item.proxy_id)?.proxy,
-        };
+      if (exportScope === 'selected' && selectedRowKeys.length === 0) {
+        messageApi.warning(t('export_scope_empty'));
+        return;
+      }
+      const source =
+        exportScope === 'selected'
+          ? rawWindowData.filter(item => item.id && selectedRowKeys.includes(item.id))
+          : rawWindowData;
+      const data =
+        exportEntity === 'profiles' ? resolveProfileExportData(source) : resolveWindowExportData(source);
+      const buffer = await buildExportZip({
+        entity: exportEntity,
+        data,
+        scope: exportScope,
       });
-      
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Windows');
-      
-      // 添加表头
-      worksheet.addRow(['ID', 'Profile ID', 'Group', 'Name', 'Remark', 'Tags', 'Proxy', 'Last Open', 'Created At']);
-      
-      // 添加数据
-      data.forEach(item => {
-        worksheet.addRow([
-          item.id, 
-          item.profile_id, 
-          item.group_name, 
-          item.name, 
-          item.remark, 
-          item.tags ? item.tags.toString().split(',').map(tag => tagMap.get(Number(tag))?.name).join(',') : '',
-          item.proxy,
-          item.opened_at ? new Date(item.opened_at + 'Z').toLocaleString() : '',
-          item.created_at ? new Date(item.created_at + 'Z').toLocaleString() : ''
-        ]);
-      });
-
-      // 调整列宽
-      worksheet.columns.forEach(column => {
-        column.width = 20;
-      });
-
-      // 生成 buffer
-      const buffer = await workbook.xlsx.writeBuffer();
-      
-      // 调用主进程的保存对话框
       const result = await CommonBridge?.saveDialog({
-        title: 'Save Windows Data',
-        defaultPath: 'windows.xlsx',
-        filters: [
-          { name: 'Excel Files', extensions: ['xlsx'] }
-        ]
+        title: t('export_scope_title'),
+        defaultPath: `${exportEntity}-export.zip`,
+        filters: [{name: 'Zip Files', extensions: ['zip']}],
       });
 
       if (result.filePath) {
-        // 将 buffer 写入文件
         await CommonBridge?.saveFile(result.filePath, buffer);
         messageApi.success('Export successfully');
+        setExportModalVisible(false);
       }
     } catch (error) {
       console.log('export windows error', error);
@@ -668,6 +691,25 @@ const Windows = () => {
             please go to the cache directory to delete manually.
           </div>
         </div>
+      </Modal>
+      <Modal
+        title={t('export_scope_title')}
+        open={exportModalVisible}
+        centered
+        onOk={exportWindows}
+        onCancel={() => setExportModalVisible(false)}
+        okText={t('export_scope_confirm')}
+        cancelText={t('export_scope_cancel')}
+      >
+        <Radio.Group
+          value={exportScope}
+          onChange={event => setExportScope(event.target.value)}
+        >
+          <Space direction="vertical">
+            <Radio value="all">{t('export_scope_all')}</Radio>
+            <Radio value="selected">{t('export_scope_selected')}</Radio>
+          </Space>
+        </Radio.Group>
       </Modal>
       <Modal
         open={proxySettingVisible}

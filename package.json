@@ -94,6 +94,7 @@
     "install": "^0.13.0",
     "ip": "^2.0.1",
     "ip2location-nodejs": "^9.6.1",
+    "jszip": "^3.10.1",
     "knex": "^3.0.1",
     "lodash": "^4.17.21",
     "node-addon-api": "^7.0.0",

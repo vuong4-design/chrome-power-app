@@ -29,6 +29,7 @@ i18n
           edit_window: 'Edit window',
 
           window_export: 'Export',
+          profile_export: 'Export profiles',
           window_open: 'Open',
           window_close: 'Close',
           window_edit: 'Edit',
@@ -61,6 +62,12 @@ i18n
           window_import_from_ads_tip: 'Click to upload(Txt/Excel)',
 
           proxy_export: 'Export',
+          export_scope_title: 'Export scope',
+          export_scope_all: 'All',
+          export_scope_selected: 'Selected',
+          export_scope_confirm: 'Export',
+          export_scope_cancel: 'Cancel',
+          export_scope_empty: 'Please select at least one item.',
           proxy_check: 'Check',
           proxy_new_proxy: 'New proxy',
           proxy_edit: 'Edit',
@@ -342,6 +349,7 @@ i18n
           edit_window: '编辑窗口',
 
           window_export: '导出',
+          profile_export: '导出档案',
           window_open: '打开',
           window_close: '关闭',
           window_edit: '编辑',
@@ -374,6 +382,12 @@ i18n
           window_import_from_ads_tip: '点击上传(Txt/Excel)',
 
           proxy_export: '导出',
+          export_scope_title: '导出范围',
+          export_scope_all: '全部',
+          export_scope_selected: '已选择',
+          export_scope_confirm: '导出',
+          export_scope_cancel: '取消',
+          export_scope_empty: '请先选择至少一项。',
           proxy_check: '检查',
           proxy_new_proxy: '新建代理',
           proxy_edit: '编辑',
