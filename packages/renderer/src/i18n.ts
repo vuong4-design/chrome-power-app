@@ -67,9 +67,15 @@ i18n
           proxy_delete: 'Delete',
           proxy_column_type: 'Proxy Type',
           proxy_column_status: 'Status',
+          proxy_column_health: 'Health',
+          proxy_column_latency: 'Latency',
           proxy_column_country: 'IP Country',
           proxy_column_remark: 'Remark',
           proxy_column_checker: 'IP Checker',
+          proxy_health_all: 'All',
+          proxy_health_healthy: 'Healthy',
+          proxy_health_degraded: 'Degraded',
+          proxy_health_unhealthy: 'Unhealthy',
           proxy_import_tip: `Instructions:
           1. If the proxy type is not specified, it will default to HTTP type.
           2. Only HTTP and SOCKS5 proxy types are supported.

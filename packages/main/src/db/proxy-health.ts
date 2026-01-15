@@ -44,9 +44,14 @@ const getHistoryByProxyId = async (proxyId: number, limit = 50) => {
     .limit(limit);
 };
 
+const getAllLatest = async () => {
+  return await db('proxy_health').select('*');
+};
+
 export const ProxyHealthDB = {
   upsertHealth,
   addHistory,
   getLatestByProxyId,
   getHistoryByProxyId,
+  getAllLatest,
 };

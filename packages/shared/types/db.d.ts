@@ -29,6 +29,8 @@ export namespace DB {
     ip_country?: string;
     ip_checker?: string;
     tags_name?: string[];
+    auto_rotate_proxy?: boolean;
+    proxy_rotation_strategy?: string;
   }
 
   export interface Proxy {
@@ -76,6 +78,8 @@ export namespace DB {
   export interface Group {
     id?: number;
     name?: string;
+    auto_rotate_proxy?: boolean;
+    proxy_rotation_strategy?: string;
   }
 
   export interface Tag {

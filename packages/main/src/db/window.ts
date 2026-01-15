@@ -20,7 +20,11 @@ const all = async () => {
       'window.opened_at',
       'window.ua',
       'window.status',
+      'window.auto_rotate_proxy',
+      'window.proxy_rotation_strategy',
       'group.name as group_name',
+      'group.auto_rotate_proxy as group_auto_rotate_proxy',
+      'group.proxy_rotation_strategy as group_proxy_rotation_strategy',
       'proxy.ip',
       'proxy.proxy',
       'proxy.proxy_type',
@@ -51,7 +55,11 @@ const getOpenedWindows = async () => {
       'window.ua',
       'window.status',
       'window.fingerprint',
+      'window.auto_rotate_proxy',
+      'window.proxy_rotation_strategy',
       'group.name as group_name',
+      'group.auto_rotate_proxy as group_auto_rotate_proxy',
+      'group.proxy_rotation_strategy as group_proxy_rotation_strategy',
       'proxy.ip',
       'proxy.proxy',
       'proxy.proxy_type',
@@ -74,6 +82,8 @@ const getById = async (id: number) => {
     .select(
       'window.*',
       'group.name as group_name',
+      'group.auto_rotate_proxy as group_auto_rotate_proxy',
+      'group.proxy_rotation_strategy as group_proxy_rotation_strategy',
       'proxy.ip',
       'proxy.proxy',
       'proxy.proxy_type',
@@ -105,6 +115,8 @@ const getByPid = async (pid: number) => {
     .select(
       'window.*',
       'group.name as group_name',
+      'group.auto_rotate_proxy as group_auto_rotate_proxy',
+      'group.proxy_rotation_strategy as group_proxy_rotation_strategy',
       'proxy.ip',
       'proxy.proxy',
       'proxy.proxy_type',
@@ -128,6 +140,18 @@ const getByPid = async (pid: number) => {
   }
 
   return windowData;
+};
+
+const getByProxyId = async (proxyId: number) => {
+  return await db('window')
+    .select(
+      'window.*',
+      'group.auto_rotate_proxy as group_auto_rotate_proxy',
+      'group.proxy_rotation_strategy as group_proxy_rotation_strategy',
+    )
+    .leftJoin('group', 'window.group_id', '=', 'group.id')
+    .where('window.proxy_id', '=', proxyId)
+    .andWhere('window.status', '>', 0);
 };
 
 const update = async (id: number, updatedData: DB.Window) => {
@@ -274,6 +298,7 @@ export const WindowDB = {
   find,
   getById,
   getByPid,
+  getByProxyId,
   getOpenedWindows,
   update,
   create,

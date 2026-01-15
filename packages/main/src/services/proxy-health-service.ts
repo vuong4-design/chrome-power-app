@@ -4,6 +4,7 @@ import type {DB} from '../../../shared/types/db';
 import {ProxyDB} from '../db/proxy';
 import {ProxyHealthDB} from '../db/proxy-health';
 import {getAgent} from '../fingerprint/prepare';
+import {WindowDB} from '../db/window';
 
 const logger = createLogger('proxy-health');
 
@@ -16,10 +17,13 @@ type ProxyHealthResult = {
   geoCity: string | null;
 };
 
+type RotationStrategy = 'round_robin' | 'lowest_latency';
+
 const defaultIntervalMs = 5 * 60 * 1000;
 const defaultTimeoutMs = 7_000;
 const defaultHealthUrl = 'https://ipinfo.io/json';
 const degradedThresholdMs = 3_000;
+const roundRobinIndex = new Map<string, number>();
 
 const resolveProxyHealthStatus = (httpStatus: number | null, latencyMs: number | null): DB.ProxyHealth['status'] => {
   if (!httpStatus || httpStatus >= 400) {
@@ -107,6 +111,70 @@ const persistHealthResult = async (proxyId: number, result: ProxyHealthResult) =
   });
 };
 
+const getRotationStrategy = (window: DB.Window) => {
+  return (window.proxy_rotation_strategy ||
+    (window as DB.Window & {group_proxy_rotation_strategy?: string}).group_proxy_rotation_strategy ||
+    'round_robin') as RotationStrategy;
+};
+
+const isRotationEnabled = (window: DB.Window) => {
+  if (window.auto_rotate_proxy) {
+    return true;
+  }
+  const groupFlag = (window as DB.Window & {group_auto_rotate_proxy?: boolean}).group_auto_rotate_proxy;
+  return Boolean(groupFlag);
+};
+
+const selectReplacementProxy = (
+  candidates: Array<DB.ProxyHealth>,
+  strategy: RotationStrategy,
+  key: string,
+) => {
+  if (candidates.length === 0) {
+    return null;
+  }
+  if (strategy === 'lowest_latency') {
+    const sorted = [...candidates].sort((a, b) => {
+      if (a.latency_ms === null) return 1;
+      if (b.latency_ms === null) return -1;
+      return (a.latency_ms ?? 0) - (b.latency_ms ?? 0);
+    });
+    return sorted[0];
+  }
+  const index = roundRobinIndex.get(key) ?? 0;
+  const next = candidates[index % candidates.length];
+  roundRobinIndex.set(key, (index + 1) % candidates.length);
+  return next;
+};
+
+const rotateWindowProxy = async (window: DB.Window, candidates: Array<DB.ProxyHealth>) => {
+  if (!window.id) {
+    return;
+  }
+  const strategy = getRotationStrategy(window);
+  const key = `${window.group_id ?? 'window'}:${strategy}`;
+  const selected = selectReplacementProxy(candidates, strategy, key);
+  if (!selected) {
+    return;
+  }
+  await WindowDB.update(window.id, {proxy_id: selected.proxy_id});
+};
+
+const handleProxyRotation = async (proxyId: number) => {
+  const windows = await WindowDB.getByProxyId(proxyId);
+  if (windows.length === 0) {
+    return;
+  }
+  const healthRows = await ProxyHealthDB.getAllLatest();
+  const candidates = healthRows.filter(row => row.proxy_id !== proxyId && row.status !== 'unhealthy');
+  for (const window of windows) {
+    if (!isRotationEnabled(window)) {
+      continue;
+    }
+    await rotateWindowProxy(window, candidates);
+  }
+};
+
 const runProxyHealthChecks = async () => {
   const proxies = await ProxyDB.all();
   for (const proxy of proxies) {
@@ -119,6 +187,9 @@ const runProxyHealthChecks = async () => {
     }
     const result = await checkProxyHealth(proxy as DB.Proxy);
     await persistHealthResult(proxyId, result);
+    if (result.status === 'unhealthy') {
+      await handleProxyRotation(proxyId);
+    }
   }
 };
 
